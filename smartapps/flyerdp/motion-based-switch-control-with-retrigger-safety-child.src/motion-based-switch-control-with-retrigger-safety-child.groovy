@@ -25,29 +25,34 @@ definition(
 preferences{
 	page(name: "Settings")
 	page(name: "OptionalSettings")
-	page(name: "TimeRestrictions")
+	page(name: "Restrictions")
 	page(name: "SetTimeRestrictions")
 }
 
 def Settings() {
 	dynamicPage(name: "Settings", title: "Motion Based Trigger Rule Settings:", install: false, uninstall: true, nextPage: "OptionalSettings") {
-	section("Motion Sensors and Switches To Use:")
-	{
+	section("Motion Sensors and Switches To Use:") {
 		input ("MotionSensors"
 			, "capability.motionSensor"
-			, title: "Select Trigger Motion Sensor(s):"
+			, title: "Select Trigger Motion Sensors:"
 			, required: true
 			, multiple:true
 		)
 		
 		input ("ControlSwitches"
 			, "capability.switch"
-			, title: "Select Switch(es) To Control with Motion Sensor(s):"
+			, title: "Select Switches To Control with Motion Sensors:"
 			, required: true
 			, multiple:true
 		)
+	}
+	section("Retrigger Safety Settings:") {
+		if (RetriggerSafetyAppliesTo == "auto") {
+			paragraph "Set the amount of time to wait when switch is manually/auto turned off before allowing new motion to retrigger."
+		}else{
+			paragraph "Set the amount of time to wait when switch is manually turned off before allowing new motion to retrigger."
+		}
 		
-		paragraph "Set the amount of time to wait when switch is manually turned off before allowing new motion to retrigger."
 		input ("RetriggerSafetyInterval"
 			, "number"
 			, title: "Motion Sensor Retrigger Safety in Seconds:"
@@ -59,16 +64,17 @@ def Settings() {
 			, title: "Retrigger Safety Applies To:"
 			, required: true
 			, defaultValue: "manual"
-			,options: ["manual":"When Switch(es) are Manually Turned Off","auto":"When Switch(es) are Auto or Manually Turned Off"]
+			,options: ["manual":"When Switches are Manually Turned Off","auto":"When Switches are Auto or Manually Turned Off"]
+			,submitOnChange:true
 		)
 	}
 }
 }
 
 def OptionalSettings() {
-	dynamicPage(name: "OptionalSettings", title: "Auto Off Options:", install: false, uninstall: true, nextPage: "TimeRestrictions") {
+	dynamicPage(name: "OptionalSettings", title: "Auto Off Options:", install: false, uninstall: true, nextPage: "Restrictions") {
 		section("") {
-			paragraph "How many seconds or minutes of inactivity until the switch is turned off?"
+			paragraph "How many minutes of inactivity until switches are turned off?"
 			input ("AutoOffMinutes"
 				, "number"
 				, title: "Auto Turn Off Time (minutes)?"
@@ -80,44 +86,46 @@ def OptionalSettings() {
 				input ("AutoOffCondition"
 					,"enum"
 					,title: "Always Auto Turn Off If..."
-					,options: [[1:"Turned On By This Smart App"],[2:"Turned On By This Smart App or Physically"],[3:"Turned on by Any Smart App"],[4:"Turned on Physically"],[5:"Turned on by Any Smart App or Physically"]]
+					,options: [[1:"Turned On By This Smart App"],[2:"Turned On By This Smart App or Physically"],[3:"Turned On By Any Smart App"],[4:"Turned On Physically"],[5:"Turned On By Any Smart App or Physically"]]
 					,defaultValue: 1
 					,required: false
 				)
 			}
-			input ("debugEnabled"
-				, "enum"
-				, title: "Enable Debug Logging?"
-				,options: ["False","True"]
-				,defaultValue: "False"
-				,required: false
-				,submitOnChange:true
-			)
 		}
 		def ishidden = true
-		if (allowCustomName == "True") {ishidden = false}
-		section("Custom Rule Naming", hideable: true, hidden: ishidden) {
+		
+		if (allowCustomName || debugEnabled) {
+			ishidden = false
+		}
+
+		section("Additional Options", hideable: true, hidden: ishidden) {
 			input ("allowCustomName"
-				, "enum"
-				, title: "Use a Custom Rule Name?"
-				,options: ["False","True"]
-				,defaultValue: "False"
+				, "bool"
+				, title: "Create a Custom Rule Name?"
+				,defaultValue: false
 				,required: false
-				,submitOnChange:true
+				,submitOnChange: true
 			)
-			if (allowCustomName == "True"){
+			if (allowCustomName){
+				debugLog(allowCustomName)
 				input ("CustomName"
 				, "text"
 				, title: "Assign a Name:"
 				,required: true
 			)
 			}
+			input ("debugEnabled"
+				, "bool"
+				, title: "Enable Debug Logging?"
+				, required: false
+				, defaultValue: false
+			)
 		}
 	}
 }
 
-def TimeRestrictions() {
-	dynamicPage(name: "TimeRestrictions", title: "Time Restrictions:", install: true, uninstall: true) {
+def Restrictions() {
+	dynamicPage(name: "Restrictions", title: "Restrictions:", install: true, uninstall: true) {
 		def TimeDescription = "Tap to Set"
 		def TimePlaceholder = ""
 		def schedStartTime = ""
@@ -205,7 +213,7 @@ def TimeRestrictions() {
 			debugLog("Specific End Time Set to: ${state.SpecificEndTime}")
 		}
 		
-		section("Time of Day:") {
+		section("") {
 			href(name: "href"
 			,title: "Only during a certain time"
 			,required: TimeofDaySet
@@ -213,9 +221,6 @@ def TimeRestrictions() {
 			,value: "${TimePlaceholder}"
 			,page: "SetTimeRestrictions"
 			)
-		}
-
-		section("On Which Days:") {
 			input ("allowedDays"
 				,"enum"
 				,title: "Only on certain days of the week:"
@@ -223,6 +228,7 @@ def TimeRestrictions() {
 				,multiple: true
 				,options: ["Monday": "Monday", "Tuesday": "Tuesday", "Wednesday": "Wednesday", "Thursday": "Thursday", "Friday": "Friday"]
 			)	
+			mode(title: "Set for specific mode(s)")
 		}
 	}
 }
@@ -313,18 +319,20 @@ def installed()
 {
 	initialize()
 	if (state.debug){ debugLog("${app.label} child Install Complete")}
+
 }
 
 def updated()
 {
 	unsubscribe()
 	initialize()
+		
 	if (allowedDays){
 		state.allowedDays = allowedDays
 	}else{
 		state.allowedDays = null
 	}
-	if (allowCustomName == "False") {
+	if (!allowCustomName) {
 		def Switches = ""
 		ControlSwitches.each{individualSwitch ->
 		if (Switches != "") Switches = Switches + " and "
@@ -341,7 +349,8 @@ def updated()
 		app.updateLabel("${CustomName}")	
 	}
 	
-	if (debugEnabled == "True") {
+	
+	if (debugEnabled) {
 		state.debug = true
 	}else{
 		state.debug = null
@@ -373,7 +382,7 @@ def updated()
 def initialize()
 {
 	state.debug = ""
-	state.vChild = "1.3.7"
+	state.vChild = "1.3.9"
 	state.ReTriggerSafety = null
 	parent.updateVer(state.vChild)
 	subscribe(MotionSensors, "motion.inactive", MotionInactiveHandler)
