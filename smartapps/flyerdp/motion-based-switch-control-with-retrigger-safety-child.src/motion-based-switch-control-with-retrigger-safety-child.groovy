@@ -82,7 +82,7 @@ def OptionalSettings() {
 				,submitOnChange:true
 			)
 			if (AutoOffMinutes > 0){
-				paragraph"Turn off via inactivity timer when switched on for any reason?"
+				paragraph"Turn off via inactivity timer when...?"
 				input ("AutoOffCondition"
 					,"enum"
 					,title: "Always Auto Turn Off If..."
@@ -400,11 +400,11 @@ def MotionActiveHandler(evt)
 		debugLog("Motion Active Handler Triggered")
 		debugLog("Motion Sensor: ${evt.displayName} is Active")
 	}
-	if ((!state.RetriggerSafety || rearmCheck(state.RetriggerSafety)) && scheduleAllowed()) {
-		//if motion is detected on any sensor and switch is off, turn on
-		ControlSwitches.each{individualSwitch ->
-			if (individualSwitch.currentState("switch").value == "off" )
-			{
+	
+	//if motion is detected on any sensor and switch is off, turn on
+	ControlSwitches.each{individualSwitch ->
+		if (individualSwitch.currentState("switch").value == "off" ){
+			if ((!state.RetriggerSafety || rearmCheck(state.RetriggerSafety)) && scheduleAllowed()) {
 				if (state.debug){ debugLog("Control Switch ${individualSwitch.displayName} is: ${individualSwitch.currentState("switch").value}, switching on.")}
 				individualSwitch.on()
 				state.AutoOn = true
