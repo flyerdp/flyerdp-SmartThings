@@ -58,7 +58,7 @@ def updated() {
 }
 
 def initialize() {
-	state.verParent = "1.1.3"
+	state.verParent = "1.1.4"
 }
 def getVersionInfo(){
 	return "Versions:\n\tMotion Control Switch Manager: ${state.verParent}\n\tMotion Control Switch Configuration: ${state.verChild ?: "Unknown."}"
