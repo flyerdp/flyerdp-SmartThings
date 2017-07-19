@@ -61,7 +61,7 @@ def Settings() {
 		)
 		input ("RetriggerSafetyAppliesTo"
 			, "enum"
-			, title: "Retrigger Safety Applies To:"
+			, title: "Retrigger Safety Applies..."
 			, required: true
 			, defaultValue: "manual"
 			,options: ["manual":"When Switches are Manually Turned Off","auto":"When Switches are Auto or Manually Turned Off"]
@@ -82,7 +82,7 @@ def OptionalSettings() {
 				,submitOnChange:true
 			)
 			if (AutoOffMinutes > 0){
-				paragraph"Turn off via inactivity timer when...?"
+				paragraph"Turn off via inactivity timer when..."
 				input ("AutoOffCondition"
 					,"enum"
 					,title: "Always Auto Turn Off If..."
@@ -94,7 +94,7 @@ def OptionalSettings() {
 		}
 		def ishidden = true
 		
-		if (allowCustomName || debugEnabled) {
+		if (allowCustomName || debugEnabled || ruleDisabled) {
 			ishidden = false
 		}
 
@@ -114,6 +114,12 @@ def OptionalSettings() {
 				,required: true
 			)
 			}
+			input ("ruleDisabled"
+				, "bool"
+				, title: "Disable This Rule"
+				, required: false
+				, defaultValue: false
+			)
 			input ("debugEnabled"
 				, "bool"
 				, title: "Enable Debug Logging?"
@@ -332,24 +338,36 @@ def updated()
 	}else{
 		state.allowedDays = null
 	}
+	
+	def isDisabled = ""
+	if (ruleDisabled) {
+		state.ruleDisabled = true
+		isDisabled = "*DISABLED* - "
+		if (state.debug){ debugLog("This Rule is Currently Disabled")}
+	}else{
+		state.ruleDisabled = false
+		if (state.debug){ debugLog("This Rule is Currently Enabled")}
+		isDisabled = ""
+	}
+
 	if (!allowCustomName) {
 		def Switches = ""
 		ControlSwitches.each{individualSwitch ->
 		if (Switches != "") Switches = Switches + " and "
-		Switches = Switches + individualSwitch.displayName 
+			Switches = Switches + individualSwitch.displayName 
 		}
 	
 		def Motions = ""
 		MotionSensors.each{individualMotionSensor -> 
-			if (Motions != "") Motions = Motions + " or "
+		if (Motions != "") Motions = Motions + " or "
 			Motions = Motions + individualMotionSensor.displayName
 		}
-		app.updateLabel("Turn on: ${Switches} on Motion: ${Motions}")
+		app.updateLabel("${isDisabled}Turn on: ${Switches} on Motion: ${Motions}")
 	}else{
-		app.updateLabel("${CustomName}")	
+		app.updateLabel("${isDisabled}${CustomName}")	
 	}
 	
-	
+
 	if (debugEnabled) {
 		state.debug = true
 	}else{
@@ -382,7 +400,7 @@ def updated()
 def initialize()
 {
 	state.debug = ""
-	state.vChild = "1.3.9"
+	state.vChild = "1.4.0"
 	state.ReTriggerSafety = null
 	parent.updateVer(state.vChild)
 	subscribe(MotionSensors, "motion.inactive", MotionInactiveHandler)
@@ -394,105 +412,110 @@ def initialize()
 //Handles Active Motion Sensor Events
 def MotionActiveHandler(evt)
 {
-	//unschedule kills runIn that waits for off timer to elapse to cancel off if new motion detected.
-	unschedule()
-	if (state.debug) {
-		debugLog("Motion Active Handler Triggered")
-		debugLog("Motion Sensor: ${evt.displayName} is Active")
-	}
-	
-	//if motion is detected on any sensor and switch is off, turn on
-	ControlSwitches.each{individualSwitch ->
-		if (individualSwitch.currentState("switch").value == "off" ){
-			if ((!state.RetriggerSafety || rearmCheck(state.RetriggerSafety)) && scheduleAllowed()) {
-				if (state.debug){ debugLog("Control Switch ${individualSwitch.displayName} is: ${individualSwitch.currentState("switch").value}, switching on.")}
-				individualSwitch.on()
-				state.AutoOn = true
-				state.ReTriggerSafety = null
+	if (!state.ruleDisabled) {
+		//unschedule kills runIn that waits for off timer to elapse to cancel off if new motion detected.
+		unschedule()
+		if (state.debug) {
+			debugLog("Motion Active Handler Triggered")
+			debugLog("Motion Sensor: ${evt.displayName} is Active")
+		}
+		
+		//if motion is detected on any sensor and switch is off, turn on
+		ControlSwitches.each{individualSwitch ->
+			if (individualSwitch.currentState("switch").value == "off" ){
+				if ((!state.RetriggerSafety || rearmCheck(state.RetriggerSafety)) && scheduleAllowed()) {
+					if (state.debug){ debugLog("Control Switch ${individualSwitch.displayName} is: ${individualSwitch.currentState("switch").value}, switching on.")}
+					individualSwitch.on()
+					state.AutoOn = true
+					state.ReTriggerSafety = null
+				}
 			}
 		}
+		if (state.debug){ debugLog("Motion Active Handler Ended")}
 	}
-	if (state.debug){ debugLog("Motion Active Handler Ended")}
 }
 
 //Handles Inactive Motion Sensor Events
 def MotionInactiveHandler(evt)
 {
-	if (state.debug) {
-		debugLog("Motion Inactive Handler Triggered")
-		debugLog("Motion Sensor: ${evt.displayName} is InActive")
-	}
-	
-	//See if any switches are on to know if I should do anything?
-	def anySwitchesOn = null
-	ControlSwitches.each{individualSwitch ->
-		if (individualSwitch.currentState("switch").value == "on" ){
-			anySwitchesOn = true
-		}
-	}
-	
-	if (!anySwitchesOn) {
-		if (state.debug){ debugLog("No Switches are on, doing nothing")}
-	}
-	//Test for no motion on all sensors if none then start the shutdown timer if one is set.
-	if (((allMotionInactive && state.AutoOn && anySwitchesOn) || (allMotionInactive && state.AutoOffCondition && anySwitchesOn)) && state.AutoOffMinutes) { 
-		debugLog("AutoOffCondition ${state.AutoOffCondition}")
-		
-		//Wait for Timeout to Elapse then turn all switches off if auto off criteria met
-		if (state.AutoOffCondition == 1 || state.AutoOffCondition == 2 || state.AutoOffCondition == 3 || state.AutoOffCondition == 5) {
-			if (state.debug){ debugLog("Auto Off Condition met, all Motion InActive going to wait for timeout of ${state.AutoOffMinutes} minutes")}
-			runIn(state.AutoOffMinutes * 60 ,NoMotionTurnAllOff)
+	if (!state.ruleDisabled) {
+		if (state.debug) {
+			debugLog("Motion Inactive Handler Triggered")
+			debugLog("Motion Sensor: ${evt.displayName} is InActive")
 		}
 		
+		//See if any switches are on to know if I should do anything?
+		def anySwitchesOn = null
+		ControlSwitches.each{individualSwitch ->
+			if (individualSwitch.currentState("switch").value == "on" ){
+				anySwitchesOn = true
+			}
+		}
+		
+		if (!anySwitchesOn) {
+			if (state.debug){ debugLog("No Switches are on, doing nothing")}
+		}
+		//Test for no motion on all sensors if none then start the shutdown timer if one is set.
+		if (((allMotionInactive && state.AutoOn && anySwitchesOn) || (allMotionInactive && state.AutoOffCondition && anySwitchesOn)) && state.AutoOffMinutes) { 
+			debugLog("AutoOffCondition ${state.AutoOffCondition}")
+			
+			//Wait for Timeout to Elapse then turn all switches off if auto off criteria met
+			if (state.AutoOffCondition == 1 || state.AutoOffCondition == 2 || state.AutoOffCondition == 3 || state.AutoOffCondition == 5) {
+				if (state.debug){ debugLog("Auto Off Condition met, all Motion InActive going to wait for timeout of ${state.AutoOffMinutes} minutes")}
+				runIn(state.AutoOffMinutes * 60 ,NoMotionTurnAllOff)
+			}
+			
+		}
+		if (state.debug){ debugLog("Motion Inactive Handler Ended")}
 	}
-	if (state.debug){ debugLog("Motion Inactive Handler Ended")}
 }
 
 //Handles all subscribed switch events
-def SwitchHandler(evt)
-{
-	if (state.debug){ debugLog("Switch Handler Triggered")}
-	switch(evt.value)
-	{
-		case "on":
-			if(evt.isPhysical()){
-				if (state.debug) debugLog("Switch: ${evt.displayName} turned on Manually")
-				state.AutoOn = false
-				state.RetriggerSafety = null
-				if (state.AutoOffCondition == 2 || state.AutoOffCondition > 3) {
-					if (state.debug){ debugLog("Auto Off Condition met, Scheduling Off Timer going to wait for timeout of ${state.AutoOffMinutes} minutes")}
-					runIn(state.AutoOffMinutes * 60 ,NoMotionTurnAllOff)
-				}
-				
-			}else{
-				if (state.debug) debugLog("Switch: ${evt.displayName} turned on Automatically")
-				debugLog("Auto Off Condition: ${state.AutoOffCondition}")
-				if ((state.AutoOffCondition == 2 && state.AutoOn) || state.AutoOffCondition == 3 || state.AutoOffCondition == 5) {
-					if (state.debug){ debugLog("Auto Off Condition met, Scheduling Off Timer going to wait for timeout of ${state.AutoOffMinutes} minutes")}
-					runIn(state.AutoOffMinutes * 60 ,NoMotionTurnAllOff)
-				}
-			}
-			break
-		case "off":
-			if(evt.isPhysical()){
-				if (state.debug) {debugLog("Switch: ${evt.displayName} turned off Manually")}
-				state.RetriggerSafety = now()
-				state.AutoOn = false
-				unschedule()
-			}else{
-				if (state.debug) debugLog("Switch: ${evt.displayName} turned off Automatically")
-				state.AutoOn = false
-				if (state.RetriggerSafetyAppliesTo == "auto"){
-					if (state.debug) debugLog("ReArm Trigger Enabled because applies to is set to auto")
-					state.RetriggerSafety = now()
-				}else{
-					if (state.debug) debugLog("ReArm Trigger Not enabled because applies to is NOT set to auto")
+def SwitchHandler(evt){
+	if (!state.ruleDisabled) {
+		if (state.debug){ debugLog("Switch Handler Triggered")}
+		switch(evt.value)
+		{
+			case "on":
+				if(evt.isPhysical()){
+					if (state.debug) debugLog("Switch: ${evt.displayName} turned on Manually")
+					state.AutoOn = false
 					state.RetriggerSafety = null
+					if (state.AutoOffCondition == 2 || state.AutoOffCondition > 3) {
+						if (state.debug){ debugLog("Auto Off Condition met, Scheduling Off Timer going to wait for timeout of ${state.AutoOffMinutes} minutes")}
+						runIn(state.AutoOffMinutes * 60 ,NoMotionTurnAllOff)
+					}
+					
+				}else{
+					if (state.debug) debugLog("Switch: ${evt.displayName} turned on Automatically")
+					debugLog("Auto Off Condition: ${state.AutoOffCondition}")
+					if ((state.AutoOffCondition == 2 && state.AutoOn) || state.AutoOffCondition == 3 || state.AutoOffCondition == 5) {
+						if (state.debug){ debugLog("Auto Off Condition met, Scheduling Off Timer going to wait for timeout of ${state.AutoOffMinutes} minutes")}
+						runIn(state.AutoOffMinutes * 60 ,NoMotionTurnAllOff)
+					}
 				}
-			}
-			break
+				break
+			case "off":
+				if(evt.isPhysical()){
+					if (state.debug) {debugLog("Switch: ${evt.displayName} turned off Manually")}
+					state.RetriggerSafety = now()
+					state.AutoOn = false
+					unschedule()
+				}else{
+					if (state.debug) debugLog("Switch: ${evt.displayName} turned off Automatically")
+					state.AutoOn = false
+					if (state.RetriggerSafetyAppliesTo == "auto"){
+						if (state.debug) debugLog("ReArm Trigger Enabled because applies to is set to auto")
+						state.RetriggerSafety = now()
+					}else{
+						if (state.debug) debugLog("ReArm Trigger Not enabled because applies to is NOT set to auto")
+						state.RetriggerSafety = null
+					}
+				}
+				break
+		}
+		if (state.debug){ debugLog("Switch Handler Ended")}
 	}
-	if (state.debug){ debugLog("Switch Handler Ended")}
 }
 
 //Checks if a schedule is set and if so then are we within the schedule
