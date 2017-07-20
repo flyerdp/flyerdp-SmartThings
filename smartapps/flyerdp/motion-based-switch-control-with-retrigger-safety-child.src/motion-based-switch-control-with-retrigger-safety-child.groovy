@@ -31,44 +31,45 @@ preferences{
 
 def Settings() {
 	dynamicPage(name: "Settings", title: "Motion Based Trigger Rule Settings:", install: false, uninstall: true, nextPage: "OptionalSettings") {
-	section("Motion Sensors and Switches To Use:") {
-		input ("MotionSensors"
-			, "capability.motionSensor"
-			, title: "Select Trigger Motion Sensors:"
-			, required: true
-			, multiple:true
-		)
-		
-		input ("ControlSwitches"
-			, "capability.switch"
-			, title: "Select Switches To Control with Motion Sensors:"
-			, required: true
-			, multiple:true
-		)
-	}
-	section("Retrigger Safety Settings:") {
-		if (RetriggerSafetyAppliesTo == "auto") {
-			paragraph "Set the amount of time to wait when switch is manually/auto turned off before allowing new motion to retrigger."
-		}else{
-			paragraph "Set the amount of time to wait when switch is manually turned off before allowing new motion to retrigger."
+		section("Motion Sensors and Switches To Use:") {
+			input ("MotionSensors"
+				, "capability.motionSensor"
+				, title: "Select Trigger Motion Sensors:"
+				, required: true
+				, multiple:true
+			)
+			
+			input ("ControlSwitches"
+				, "capability.switch"
+				, title: "Select Switches To Control with Motion Sensors:"
+				, required: true
+				, multiple:true
+			)
 		}
-		
-		input ("RetriggerSafetyInterval"
-			, "number"
-			, title: "Motion Sensor Retrigger Safety in Seconds:"
-			, required: true
-			, defaultValue: 16
-		)
-		input ("RetriggerSafetyAppliesTo"
-			, "enum"
-			, title: "Retrigger Safety Applies..."
-			, required: true
-			, defaultValue: "manual"
-			,options: ["manual":"When Switches are Manually Turned Off","auto":"When Switches are Auto or Manually Turned Off"]
-			,submitOnChange:true
-		)
+		section("Retrigger Safety Settings:") {
+			if (RetriggerSafetyAppliesTo == "auto") {
+				paragraph "Set the amount of time to wait when switch is manually/auto turned off before allowing new motion to retrigger."
+			}else{
+				paragraph "Set the amount of time to wait when switch is manually turned off before allowing new motion to retrigger."
+			}
+			
+			input ("RetriggerSafetyInterval"
+				, "number"
+				, title: "Motion Sensor Retrigger Safety in Seconds:"
+				, required: true
+				, defaultValue: 16
+			)
+			input ("RetriggerSafetyAppliesTo"
+				, "enum"
+				, title: "Retrigger Safety Applies..."
+				, required: true
+				, defaultValue: "manual"
+				,options: ["manual":"When Switches are Manually Turned Off","auto":"When Switches are Auto or Manually Turned Off"]
+				,submitOnChange:true
+			)
+		}
+		remove("Delete this Rule", "Delete this Rule?", "${app.label}")
 	}
-}
 }
 
 def OptionalSettings() {
@@ -116,7 +117,7 @@ def OptionalSettings() {
 			}
 			input ("ruleDisabled"
 				, "bool"
-				, title: "Disable This Rule"
+				, title: "Disable This Rule?"
 				, required: false
 				, defaultValue: false
 			)
@@ -127,6 +128,7 @@ def OptionalSettings() {
 				, defaultValue: false
 			)
 		}
+		remove("Delete this Rule", "Delete this Rule?", "${app.label}")
 	}
 }
 
@@ -232,10 +234,11 @@ def Restrictions() {
 				,title: "Only on certain days of the week:"
 				,required: false
 				,multiple: true
-				,options: ["Monday": "Monday", "Tuesday": "Tuesday", "Wednesday": "Wednesday", "Thursday": "Thursday", "Friday": "Friday"]
+				,options: ["Monday": "Monday", "Tuesday": "Tuesday", "Wednesday": "Wednesday", "Thursday": "Thursday", "Friday": "Friday", "Saturday": "Saturday", "Sunday": "Sunday"]
 			)	
 			mode(title: "Set for specific mode(s)")
 		}
+		remove("Delete this Rule", "Delete this Rule?", "${app.label}")
 	}
 }
 
@@ -400,7 +403,7 @@ def updated()
 def initialize()
 {
 	state.debug = ""
-	state.vChild = "1.4.1"
+	state.vChild = "1.4.3"
 	state.ReTriggerSafety = null
 	parent.updateVer(state.vChild)
 	subscribe(MotionSensors, "motion.inactive", MotionInactiveHandler)
@@ -460,10 +463,10 @@ def MotionInactiveHandler(evt)
 			if (state.debug){ debugLog("No Switches are on, doing nothing")}
 		}
 		//Test for no motion on all sensors if none then start the shutdown timer if one is set.
-		if (((allMotionInactive && state.AutoOn && anySwitchesOn) || (allMotionInactive && state.AutoOffCondition && anySwitchesOn)) && state.AutoOffMinutes) { 
+		if (((allMotionInactive && state.AutoOn && anySwitchesOn) || (allMotionInactive && state.AutoOffCondition && anySwitchesOn)) && state.AutoOffMinutes()) { 
 			
 			//Wait for Timeout to Elapse then turn all switches off if auto off criteria met
-			if (state.AutoOffCondition == 1 || state.AutoOffCondition == 2 || state.AutoOffCondition == 3 || state.AutoOffCondition == 5) {
+			if ((state.AutoOffCondition == 1 || state.AutoOffCondition == 2 || state.AutoOffCondition == 3 || state.AutoOffCondition == 5) && scheduleAllowed()) {
 				if (state.debug){ debugLog("Auto Off Condition met, all Motion InActive going to wait for timeout of ${state.AutoOffMinutes} minutes")}
 				runIn(state.AutoOffMinutes * 60 ,NoMotionTurnAllOff)
 			}
@@ -485,14 +488,14 @@ def SwitchHandler(evt){
 					if (state.debug) debugLog("Switch: ${evt.displayName} turned on Manually")
 					state.AutoOn = false
 					state.RetriggerSafety = null
-					if (state.AutoOffCondition == 2 || state.AutoOffCondition > 3) {
+					if ((state.AutoOffCondition == 2 || state.AutoOffCondition > 3) && scheduleAllowed()) {
 						if (state.debug){ debugLog("Auto Off Condition met, Scheduling Off Timer going to wait for timeout of ${state.AutoOffMinutes} minutes")}
 						runIn(state.AutoOffMinutes * 60 ,NoMotionTurnAllOff)
 					}
 					
 				}else{
 					if (state.debug) debugLog("Switch: ${evt.displayName} turned on Automatically")
-					if ((state.AutoOffCondition == 2 && state.AutoOn) || state.AutoOffCondition == 3 || state.AutoOffCondition == 5) {
+					if (((state.AutoOffCondition == 2 && state.AutoOn) || state.AutoOffCondition == 3 || state.AutoOffCondition == 5) && scheduleAllowed()) {
 						if (state.debug){ debugLog("Auto Off Condition met, Scheduling Off Timer going to wait for timeout of ${state.AutoOffMinutes} minutes")}
 						runIn(state.AutoOffMinutes * 60 ,NoMotionTurnAllOff)
 					}
