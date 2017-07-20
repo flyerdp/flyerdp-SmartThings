@@ -45,6 +45,7 @@ def main(){
                 	paragraph("Tap done to finish installing the Manager then re-open the app from the smartApps flyout to create your motion triggered switch rules.")
                 }
             }
+			remove("Delete Manager", "Delete?", "${app.label}")
         }
 }
 
@@ -58,7 +59,7 @@ def updated() {
 }
 
 def initialize() {
-	state.verParent = "1.1.3"
+	state.verParent = "1.1.5"
 }
 def getVersionInfo(){
 	return "Versions:\n\tMotion Control Switch Manager: ${state.verParent}\n\tMotion Control Switch Configuration: ${state.verChild ?: "Unknown."}"
