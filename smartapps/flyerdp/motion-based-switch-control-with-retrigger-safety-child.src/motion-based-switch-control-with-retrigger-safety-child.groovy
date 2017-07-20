@@ -324,15 +324,13 @@ def SetTimeRestrictions() {
 	}
 }
 
-def installed()
-{
+def installed(){
 	initialize()
 	if (state.debug){ debugLog("${app.label} child Install Complete")}
 
 }
 
-def updated()
-{
+def updated(){
 	unsubscribe()
 	initialize()
 		
@@ -400,10 +398,9 @@ def updated()
 	}
 }
 
-def initialize()
-{
+def initialize(){
 	state.debug = ""
-	state.vChild = "1.4.3"
+	state.vChild = "1.4.4"
 	state.ReTriggerSafety = null
 	parent.updateVer(state.vChild)
 	subscribe(MotionSensors, "motion.inactive", MotionInactiveHandler)
@@ -413,8 +410,7 @@ def initialize()
 }
 
 //Handles Active Motion Sensor Events
-def MotionActiveHandler(evt)
-{
+def MotionActiveHandler(evt){
 	if (state.debug) {
 		debugLog("Motion Active Handler Triggered")
 		debugLog("Motion Sensor: ${evt.displayName} is Active")
@@ -432,7 +428,7 @@ def MotionActiveHandler(evt)
 					state.AutoOn = true
 					state.ReTriggerSafety = null
 				}else{
-					debugLog("Motion Active Handler Triggered doing nothing, criteria not met")
+					if (state.debug) {debugLog("Motion Active Handler Triggered doing nothing, criteria not met")}
 				}
 			}
 		}
@@ -443,8 +439,7 @@ def MotionActiveHandler(evt)
 }
 
 //Handles Inactive Motion Sensor Events
-def MotionInactiveHandler(evt)
-{
+def MotionInactiveHandler(evt){
 	if (state.debug) {
 		debugLog("Motion Inactive Handler Triggered")
 		debugLog("Motion Sensor: ${evt.displayName} is InActive")
@@ -463,7 +458,7 @@ def MotionInactiveHandler(evt)
 			if (state.debug){ debugLog("No Switches are on, doing nothing")}
 		}
 		//Test for no motion on all sensors if none then start the shutdown timer if one is set.
-		if (((allMotionInactive && state.AutoOn && anySwitchesOn) || (allMotionInactive && state.AutoOffCondition && anySwitchesOn)) && state.AutoOffMinutes()) { 
+		if (((allMotionInactive && state.AutoOn && anySwitchesOn) || (allMotionInactive && state.AutoOffCondition && anySwitchesOn)) && state.AutoOffMinutes) { 
 			
 			//Wait for Timeout to Elapse then turn all switches off if auto off criteria met
 			if ((state.AutoOffCondition == 1 || state.AutoOffCondition == 2 || state.AutoOffCondition == 3 || state.AutoOffCondition == 5) && scheduleAllowed()) {
@@ -633,20 +628,21 @@ def rearmCheck(LastOffTime){
 	}
 	if (LastOffTime) {
 		if (now() - LastOffTime > RetriggerSafetyInterval.toInteger()*1000) {
-			debugLog("ReArmTrigger Time Has Elapsed")
+			if (state.debug){ debugLog("ReArmTrigger Time Has Elapsed")}
 			return true
 		}else{
-			debugLog("ReArmTrigger Time NOT Elapsed")
+			if (state.debug){ debugLog("ReArmTrigger Time NOT Elapsed")}
 			return
 		}
 	}else{
-		debugLog("ReArmTrigger Time Null")
+		if (state.debug){ debugLog("ReArmTrigger Time Null")}
 		return true
 	}
 }
 
 //Test if No Motion is present on any of the selected motion sensors
 def NoMotionTurnAllOff(){
+	if (state.debug){ debugLog("NoMotionTurnAllOff Started")}
 	ControlSwitches.each{individualSwitch ->
 		if (individualSwitch.currentState("switch").value == "on" ){
 			if(state.AutoOffMinutes != 0) {
