@@ -98,7 +98,7 @@ def OptionalSettings() {
 			ishidden = false
 		}
 
-		section("Additional Options", hideable: true, hidden: ishidden) {
+		section("More Options", hideable: true, hidden: ishidden) {
 			input ("allowCustomName"
 				, "bool"
 				, title: "Create a Custom Rule Name?"
@@ -400,7 +400,7 @@ def updated()
 def initialize()
 {
 	state.debug = ""
-	state.vChild = "1.4.0"
+	state.vChild = "1.4.1"
 	state.ReTriggerSafety = null
 	parent.updateVer(state.vChild)
 	subscribe(MotionSensors, "motion.inactive", MotionInactiveHandler)
@@ -412,13 +412,13 @@ def initialize()
 //Handles Active Motion Sensor Events
 def MotionActiveHandler(evt)
 {
+	if (state.debug) {
+		debugLog("Motion Active Handler Triggered")
+		debugLog("Motion Sensor: ${evt.displayName} is Active")
+	}
 	if (!state.ruleDisabled) {
 		//unschedule kills runIn that waits for off timer to elapse to cancel off if new motion detected.
 		unschedule()
-		if (state.debug) {
-			debugLog("Motion Active Handler Triggered")
-			debugLog("Motion Sensor: ${evt.displayName} is Active")
-		}
 		
 		//if motion is detected on any sensor and switch is off, turn on
 		ControlSwitches.each{individualSwitch ->
@@ -428,22 +428,26 @@ def MotionActiveHandler(evt)
 					individualSwitch.on()
 					state.AutoOn = true
 					state.ReTriggerSafety = null
+				}else{
+					debugLog("Motion Active Handler Triggered doing nothing, criteria not met")
 				}
 			}
 		}
-		if (state.debug){ debugLog("Motion Active Handler Ended")}
+	}else{
+		if (state.debug){ debugLog("Motion Active Handler doing nothing, rule is inactive!")}
 	}
+	if (state.debug){ debugLog("Motion Active Handler Ended")}
 }
 
 //Handles Inactive Motion Sensor Events
 def MotionInactiveHandler(evt)
 {
+	if (state.debug) {
+		debugLog("Motion Inactive Handler Triggered")
+		debugLog("Motion Sensor: ${evt.displayName} is InActive")
+	}
+	
 	if (!state.ruleDisabled) {
-		if (state.debug) {
-			debugLog("Motion Inactive Handler Triggered")
-			debugLog("Motion Sensor: ${evt.displayName} is InActive")
-		}
-		
 		//See if any switches are on to know if I should do anything?
 		def anySwitchesOn = null
 		ControlSwitches.each{individualSwitch ->
@@ -457,23 +461,23 @@ def MotionInactiveHandler(evt)
 		}
 		//Test for no motion on all sensors if none then start the shutdown timer if one is set.
 		if (((allMotionInactive && state.AutoOn && anySwitchesOn) || (allMotionInactive && state.AutoOffCondition && anySwitchesOn)) && state.AutoOffMinutes) { 
-			debugLog("AutoOffCondition ${state.AutoOffCondition}")
 			
 			//Wait for Timeout to Elapse then turn all switches off if auto off criteria met
 			if (state.AutoOffCondition == 1 || state.AutoOffCondition == 2 || state.AutoOffCondition == 3 || state.AutoOffCondition == 5) {
 				if (state.debug){ debugLog("Auto Off Condition met, all Motion InActive going to wait for timeout of ${state.AutoOffMinutes} minutes")}
 				runIn(state.AutoOffMinutes * 60 ,NoMotionTurnAllOff)
 			}
-			
 		}
-		if (state.debug){ debugLog("Motion Inactive Handler Ended")}
+	}else{
+		if (state.debug){ debugLog("Motion Inactive Handler doing nothing, rule is inactive!")}
 	}
+	if (state.debug){ debugLog("Motion Inactive Handler Ended")}
 }
 
 //Handles all subscribed switch events
 def SwitchHandler(evt){
+	if (state.debug){ debugLog("Switch Handler Triggered")}
 	if (!state.ruleDisabled) {
-		if (state.debug){ debugLog("Switch Handler Triggered")}
 		switch(evt.value)
 		{
 			case "on":
@@ -488,7 +492,6 @@ def SwitchHandler(evt){
 					
 				}else{
 					if (state.debug) debugLog("Switch: ${evt.displayName} turned on Automatically")
-					debugLog("Auto Off Condition: ${state.AutoOffCondition}")
 					if ((state.AutoOffCondition == 2 && state.AutoOn) || state.AutoOffCondition == 3 || state.AutoOffCondition == 5) {
 						if (state.debug){ debugLog("Auto Off Condition met, Scheduling Off Timer going to wait for timeout of ${state.AutoOffMinutes} minutes")}
 						runIn(state.AutoOffMinutes * 60 ,NoMotionTurnAllOff)
@@ -514,13 +517,17 @@ def SwitchHandler(evt){
 				}
 				break
 		}
-		if (state.debug){ debugLog("Switch Handler Ended")}
+	}else{
+		if (state.debug){ debugLog("Switch Handler doing nothing, rule is inactive")}
 	}
+	if (state.debug){ debugLog("Switch Handler Ended")}
 }
 
 //Checks if a schedule is set and if so then are we within the schedule
-def scheduleAllowed(){	
+def scheduleAllowed(){
+	if (state.debug){ debugLog("Check if Schedule Allowed")}
 	if (state.StartAt || state.EndAt || state.SpecificStartTime || state.SpecificEndTime){
+		if (state.debug){ debugLog("A Time interval is specified.  Checking")}
 		def df = new java.text.SimpleDateFormat("EEEE")
 		df.setTimeZone(location.timeZone)
 		def day = df.format(new Date())
@@ -564,9 +571,6 @@ def scheduleAllowed(){
 			}
 		}
 		
-
-		
-		//def sunsetTime = new Date(location.currentValue("sunsetTime"))
 		if (state.debug){
 			debugLog("Current Day: ${day}")
 			debugLog("Sunrise Time: ${sunriseTime}")
@@ -644,12 +648,11 @@ def NoMotionTurnAllOff(){
 		if (individualSwitch.currentState("switch").value == "on" ){
 			if(state.AutoOffMinutes != 0) {
 				if (state.debug){ debugLog("Control Switch ${individualSwitch.displayName} is: ${individualSwitch.currentState("switch").value}, switching off.")}
-					individualSwitch.off()
-				}
+				individualSwitch.off()
 			}
 		}
+	}
 }
 
 //Debug Logger
-def debugLog(message){ log.debug "//Motion Based Switch Control Child Debug\\\\: $message"
-}
+def debugLog(message){ log.debug "//Motion Based Switch Control Child Debug\\\\: $message"}
