@@ -48,9 +48,11 @@ def Settings() {
 				, required: true
 				, multiple:true
 			)
-
+			//Laying foundation for adding more devices to control
+			def mySwitches = "capability.switch"
+			//def myBulbs = "capability.bulb"
 			input ("ControlSwitches"
-				, "capability.switch"
+				, "${mySwitches}"
 				, title: "Select Switches To Control with Motion Sensors:"
 				, required: true
 				, multiple:true
@@ -401,22 +403,35 @@ def updated(){
 		if (state.debug){ debugLog("Set AutoOffMinutes Value to: ${state.AutoOffMinutes}")}
 		state.AutoOffMinutes = AutoOffMinutes.toInteger()
 	}
-
+//Check Sunset and Sunrise values.  If they have not been initialized then do so
+	if (!state.sunsetTime) {
+		state.sunsetTime = location.currentValue("sunsetTime")
+	}
+	
+	if (!state.sunriseTime) {
+		state.sunriseTime =  location.currentValue("sunriseTime")
+	}
+	
 	if (state.debug){ 
 		debugLog("Set RetriggerSafetyAppliesTo to: ${state.RetriggerSafetyAppliesTo}")
 		debugLog("${app.label} child Update Complete")
+		debugLog("SunRise Time: ${state.sunriseTime}")
+		debugLog("SunSet Time: ${state.sunsetTime}")
 	}
 }
 
 def initialize(){
 	state.debug = ""
-	state.vChild = "1.4.5"
+	state.vChild = "1.4.6"
 	state.ReTriggerSafety = null
 	parent.updateVer(state.vChild)
 	subscribe(MotionSensors, "motion.inactive", MotionInactiveHandler)
 	subscribe(MotionSensors, "motion.active", MotionActiveHandler)
 	subscribe(ControlSwitches, "switch", SwitchHandler)
-	if (state.debug){ debugLog("${app.label} child Initialize Complete")}
+	subscribe(location, "sunsetTime", sunsetTimeHandler)
+	subscribe(location, "sunriseTime", sunriseTimeHandler)
+	
+	if (state.debug){ debugLog("${app.label} Initialize Complete")}
 }
 
 //Handles Active Motion Sensor Events
@@ -531,6 +546,24 @@ def SwitchHandler(evt){
 	if (state.debug){ debugLog("Switch Handler Ended")}
 }
 
+//Sunset and Sunrist Time Handler to update the TOD for Sunet/Sunrise
+def sunsetTimeHandler(evt){
+	if (state.debug){ debugLog("sunsetTime Handler Started")}
+	state.sunsetTime = Date.parse("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", evt.value)  //WAS location.currentValue("sunsetTime")
+	if (state.debug){
+		debugLog("sunsetTime set to: ${state.sunsetTime}")
+		debugLog("sunsetTime Handler Ended")
+	}
+}
+
+def sunriseTimeHandler(){
+	state.sunsriseTime = Date.parse("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", evt.value) //WAS location.currentValue("sunriseTime")
+	if (state.debug){
+		debugLog("sunriseTime set to: ${state.sunsriseTime}")
+		debugLog("sunriseTime Handler Ended")
+	}
+}
+
 //Checks if a schedule is set and if so then are we within the schedule
 def scheduleAllowed(){
 	if (state.debug){ debugLog("Check if Schedule Allowed")}
@@ -541,21 +574,24 @@ def scheduleAllowed(){
 		def day = df.format(new Date())
 		def fromTime = null
 		def toTime = null
-		def sunsetTime = null
-		def sunriseTime = null
-		
+		if (!state.sunsetTime){
+			state.sunsetTime = location.currentValue("sunsetTime")
+			state.sunriseTime =  location.currentValue("sunriseTime")
+		}
+		def sunsetTime = Date.parse("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", state.sunsetTime)
+		def sunriseTime = Date.parse("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", state.sunsetTime)
 		fromTime = state.SpecificStartTime
 		toTime = state.SpecificEndTime
 		
 		if (StartAt == "Sunrise") {
-			sunriseTime = Date.parse("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", location.currentValue("sunriseTime"))
+			
 			if (state.StartAtOffSet){
 				fromTime = new Date(sunriseTime.time + (state.StartAtOffSet * 60 * 1000))
 			}else{
 				fromTime = sunriseTime
 			}
 		}else if (StartAt == "Sunset") {
-		    sunsetTime = Date.parse("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", location.currentValue("sunsetTime"))
+		    
 			if (state.StartAtOffSet){
 				fromTime = new Date(sunsetTime.time + (state.StartAtOffSet * 60 * 1000))
 			}else{
@@ -564,14 +600,12 @@ def scheduleAllowed(){
 		}
 		
 		if (EndAt == "Sunrise") {
-			sunriseTime = Date.parse("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", location.currentValue("sunriseTime"))
 			if (state.EndAtOffSet){
 				toTime = new Date(sunriseTime.time + (state.EndAtOffSet * 60 * 1000))
 			}else{
 				toTime = sunriseTime
 			}
 		}else if (EndAt == "Sunset") {
-			sunsetTime = Date.parse("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", location.currentValue("sunsetTime"))
 			if (state.EndAtOffSet){
 				toTime = new Date(sunsetTime.time + (state.EndAtOffSet * 60 * 1000))
 			}else{
