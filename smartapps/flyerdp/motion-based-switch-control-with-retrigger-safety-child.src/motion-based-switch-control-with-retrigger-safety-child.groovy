@@ -404,6 +404,9 @@ def updated(){
 		state.AutoOffMinutes = AutoOffMinutes.toInteger()
 	}
 //Check Sunset and Sunrise values.  If they have not been initialized then do so
+//Remove next two lines after a bit because they need to be retro initialized
+state.sunsetTime = location.currentValue("sunsetTime")
+state.sunriseTime =  location.currentValue("sunriseTime")
 	if (!state.sunsetTime) {
 		state.sunsetTime = location.currentValue("sunsetTime")
 	}
@@ -549,7 +552,7 @@ def SwitchHandler(evt){
 //Sunset and Sunrist Time Handler to update the TOD for Sunet/Sunrise
 def sunsetTimeHandler(evt){
 	if (state.debug){ debugLog("sunsetTime Handler Started")}
-	state.sunsetTime = Date.parse("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", evt.value)  //WAS location.currentValue("sunsetTime")
+	state.sunsetTime = location.currentValue("sunsetTime")
 	if (state.debug){
 		debugLog("sunsetTime set to: ${state.sunsetTime}")
 		debugLog("sunsetTime Handler Ended")
@@ -557,7 +560,7 @@ def sunsetTimeHandler(evt){
 }
 
 def sunriseTimeHandler(){
-	state.sunsriseTime = Date.parse("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", evt.value) //WAS location.currentValue("sunriseTime")
+	state.sunsriseTime = location.currentValue("sunriseTime")
 	if (state.debug){
 		debugLog("sunriseTime set to: ${state.sunsriseTime}")
 		debugLog("sunriseTime Handler Ended")
@@ -578,8 +581,10 @@ def scheduleAllowed(){
 			state.sunsetTime = location.currentValue("sunsetTime")
 			state.sunriseTime =  location.currentValue("sunriseTime")
 		}
+
 		def sunsetTime = Date.parse("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", state.sunsetTime)
-		def sunriseTime = Date.parse("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", state.sunsetTime)
+		def sunriseTime = Date.parse("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", state.sunriseTime)
+		
 		fromTime = state.SpecificStartTime
 		toTime = state.SpecificEndTime
 		
