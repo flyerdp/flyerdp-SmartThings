@@ -577,6 +577,7 @@ def scheduleAllowed(){
 		def day = df.format(new Date())
 		def fromTime = null
 		def toTime = null
+		
 		if (!state.sunsetTime){
 			state.sunsetTime = location.currentValue("sunsetTime")
 			state.sunriseTime =  location.currentValue("sunriseTime")
@@ -651,7 +652,7 @@ def scheduleAllowed(){
 			return false
 		}
 	}
-	return false
+	return true
 }
 
 //Returns True if all motion sensors are inactive
