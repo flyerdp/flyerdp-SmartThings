@@ -269,18 +269,6 @@ def SetTimeRestrictions() {
 		def StartAtOptions = ["Sunrise":"Sunrise","Sunset":"Sunset","Specific Time":"Specific Time"]
 		def EndAtOptions = ["Sunrise":"Sunrise","Sunset":"Sunset","Specific Time":"Specific Time"]
 
-		if (StartAt == "Sunrise"){
-			EndAtOptions = ["Sunset":"Sunset","Specific Time":"Specific Time"]
-		}else if (StartAt == "Sunset"){
-			EndAtOptions = ["Sunrise":"Sunrise","Specific Time":"Specific Time"]
-		}
-
-		if (EndAt == "Sunrise"){
-			StartAtOptions = ["Sunset":"Sunset","Specific Time":"Specific Time"]
-		}else if (EndAt == "Sunset"){
-			StartAtOptions = ["Sunrise":"Sunrise","Specific Time":"Specific Time"]
-		}
-		
 		section("") {
 			input ("StartAt"
 				,"enum"
