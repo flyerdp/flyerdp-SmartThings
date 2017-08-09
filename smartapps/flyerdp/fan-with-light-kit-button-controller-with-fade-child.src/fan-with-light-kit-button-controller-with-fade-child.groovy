@@ -62,7 +62,7 @@ def AppSettings() {
 				, multiple:false
 			)
 		}
-		remove("Delete this Button Rule", "Delete this Rule?", "${app.label}")
+		remove("Delete this Remote Rule", "Delete this Rule?", "${app.label}")
 	}
 }
 
@@ -133,7 +133,7 @@ def OptionalSettings() {
 				, defaultValue: false
 			)
 		}
-		remove("Delete this Button Rule", "Delete this Rule?", "${app.label}")
+		remove("Delete this Remote Rule", "Delete this Rule?", "${app.label}")
 	}
 }
 
@@ -243,7 +243,7 @@ def Restrictions() {
 			)	
 			mode(title: "Set for specific mode(s)")
 		}
-		remove("Delete this Button Rule", "Delete this Rule?", "${app.label}")
+		remove("Delete this Remote Rule", "Delete this Rule?", "${app.label}")
 	}
 }
 
