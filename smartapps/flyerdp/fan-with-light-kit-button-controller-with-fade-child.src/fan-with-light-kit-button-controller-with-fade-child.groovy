@@ -504,6 +504,7 @@ if (state.debug){ debugLog("Setting Guarantee Level: ${state.Fadelevel}")}
 		LightSwitch.setLevel(state.Fadelevel)
 	}
 	state.Fadelevel = null
+	state.LightFading = false
 }
 
 def LightFade(){
